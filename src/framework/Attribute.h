@@ -336,12 +336,19 @@ class Attribute
 		/*!
 		 * Converts the attribute value to a string.
 		 * @remarks Used by the CLI to display data to the screen and XML.
-		 * @param[in] hex
-		 * 		true = display numbers in hexadecimal format.
-		 * 		false (default) = display numbers in decimal format.
+		 * 	The default uses an empty string for the prefix and suffix,
+		 * 	and the string ", " as the list separator.
+		 * @param[in] prefix
+		 * 		string to put before each value
+		 * @param[in] suffix
+		 * 		string to put after each value
+		 * @param[in] sep
+		 * 		string used to separate multiple values
 		 * @return The attribute value as a string.
 		 */
 		std::string asStr() const;
+		std::string asStr(std::string prefix, std::string suffix,
+			std::string sep) const;
 
 
 		/*!
@@ -349,6 +356,12 @@ class Attribute
 		 * @return true if the attribute is a key, false if not.
 		 */
 		bool isKey() const;
+
+		/*!
+		 * Is the attribute one of the array types?
+		 * @return true if it's an array, false if not
+		 */
+		bool isArray() const;
 
 		/*!
 		 * Is the attribute one of the numeric types?

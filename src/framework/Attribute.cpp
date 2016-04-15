@@ -796,9 +796,14 @@ wbem::framework::Attribute& wbem::framework::Attribute::operator=(const Attribut
  */
 std::string wbem::framework::Attribute::asStr() const
 {
+	return asStr("", "", ", ");
+}
+std::string wbem::framework::Attribute::asStr(std::string prefix, std::string suffix,
+					std::string sep) const
+{
 	std::stringstream result;
 	COMMON_DATETIME_STR datetime;
-
+	result << prefix;
 	switch (m_Type)
 	{
 		case ENUM16_T:
@@ -843,9 +848,9 @@ std::string wbem::framework::Attribute::asStr() const
 			{
 				if (i > 0)
 				{
-					result << ", ";
+					result << suffix << sep << prefix;
 				}
-				result << m_UInt8List[i];
+				result << (unsigned int)m_UInt8List[i];
 			}
 			break;
 		case UINT16_LIST_T:
@@ -853,9 +858,9 @@ std::string wbem::framework::Attribute::asStr() const
 			{
 				if (i > 0)
 				{
-					result << ", ";
+					result << suffix << sep << prefix;
 				}
-				result << m_UInt16List[i];
+				result << (unsigned int)m_UInt16List[i];
 			}
 			break;
 		case UINT32_LIST_T:
@@ -863,9 +868,9 @@ std::string wbem::framework::Attribute::asStr() const
 			{
 				if (i > 0)
 				{
-					result << ", ";
+					result << suffix << sep << prefix;
 				}
-				result << m_UInt32List[i];
+				result << (unsigned int)m_UInt32List[i];
 			}
 			break;
 		case UINT64_LIST_T:
@@ -873,9 +878,9 @@ std::string wbem::framework::Attribute::asStr() const
 			{
 				if (i > 0)
 				{
-					result << ", ";
+					result << suffix << sep << prefix;
 				}
-				result << m_UInt64List[i];
+				result << (unsigned long long)m_UInt64List[i];
 			}
 			break;
 		case STR_LIST_T:
@@ -883,7 +888,7 @@ std::string wbem::framework::Attribute::asStr() const
 			{
 				if (i > 0)
 				{
-					result << ", ";
+					result << suffix << sep << prefix;
 				}
 				result << m_StrList[i];
 			}
@@ -900,6 +905,7 @@ std::string wbem::framework::Attribute::asStr() const
 			COMMON_LOG_ERROR_F("Invalid attribute type %d", m_Type);
 			break;
 	}
+	result << suffix;
 	return result.str();
 }
 
@@ -932,6 +938,30 @@ bool wbem::framework::Attribute::listEqual(const TYPE list1, const TYPE list2) c
 			}
 		}
 	}
+	return result;
+}
+
+
+/*
+ * Find out if the attribute is an array type
+ */
+bool wbem::framework::Attribute::isArray() const
+{
+	bool result = false;
+	switch (m_Type)
+	{
+	case UINT8_LIST_T:
+	case UINT16_LIST_T:
+	case UINT32_LIST_T:
+	case UINT64_LIST_T:
+	case STR_LIST_T:
+		result = true;
+		break;
+	default:
+		result = false;
+		break;
+	}
+
 	return result;
 }
 

@@ -196,20 +196,35 @@ std::string wbem::framework::Instance::getCimXml() const
 {
 	std::stringstream xml;
 
+	std::string value_xml_open = "<" + CX_VALUE + ">";
+	std::string value_xml_close = "</" + CX_VALUE + ">";
+
 	xml << "<" << CX_INSTANCE << " " + CX_CLASSNAME + "=\"" << m_Class << "\">";
 	for(attributes_t::const_iterator iter = m_InstanceAttributes.begin();
 			iter != m_InstanceAttributes.end();
 			iter ++)
 	{
+		std::stringstream value;
 		Attribute attribute = (*iter).second;
-		xml << "<" << CX_PROPERTY << " " <<
+
+		std::string propertyStr = CX_PROPERTY;
+		if (attribute.isArray())
+		{
+			propertyStr = CX_PROPERTYARRAY;
+			value << "<" << CX_VALUEARRAY << ">";
+		}
+		value << attribute.asStr(value_xml_open, value_xml_close, "");
+		if (attribute.isArray())
+		{
+			 value << "</" << CX_VALUEARRAY << ">";
+		}
+
+		xml << "<" << propertyStr << " " <<
 				CX_NAME << "=\"" << (*iter).first << "\" " <<
 				CX_TYPE << "=\"" << CimXml::enumToString(attribute.getType()) << "\"" <<
 				">" <<
-				"<" << CX_VALUE << ">" <<
-				attribute.asStr() <<
-				"</" << CX_VALUE << ">" <<
-				"</" << CX_PROPERTY <<  ">"
+				value.str() <<
+				"</" << propertyStr <<  ">"
 				;
 	}
 
