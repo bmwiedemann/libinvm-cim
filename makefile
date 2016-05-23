@@ -215,16 +215,16 @@ rpm :
 	#Make the Directories
 	$(MKDIR) $(RPMBUILD_DIR) $(RPMBUILD_DIR)/BUILD $(RPMBUILD_DIR)/SOURCES $(RPMBUILD_DIR)/RPMS \
 	$(RPMBUILD_DIR)/SRPMS $(RPMBUILD_DIR)/SPECS $(RPMBUILD_DIR)/BUILDROOT \
-	$(RPMBUILD_DIR)/BUILD/$(LIB_BASENAME)
-	
+	$(RPMBUILD_DIR)/BUILD/$(LIB_BASENAME)-$(BUILDNUM)
+
 	#Copy Spec File
 	$(COPY) install/linux/$(LINUX_DIST)-release/*.spec $(RPMBUILD_DIR)/SPECS/$(LIB_BASENAME).spec
 	#Update the Spec file
 	$(SED) -i 's/^%define build_version .*/%define build_version $(BUILDNUM)/g' $(RPMBUILD_DIR)/SPECS/$(LIB_BASENAME).spec
-	
+
 	#Archive the directory
-	git archive --format=tar --prefix="$(LIB_BASENAME)/" HEAD | bzip2 -c > $(RPMBUILD_DIR)/SOURCES/$(LIB_BASENAME).tar.bz2
-	#rpmbuild 
-	$(RPMBUILD) -ba $(RPMBUILD_DIR)/SPECS/$(LIB_BASENAME).spec --define "_topdir $(RPMBUILD_DIR)" 
-	
+	git archive --format=tar --prefix="$(LIB_BASENAME)-$(BUILDNUM)/" HEAD | gzip -c > $(RPMBUILD_DIR)/SOURCES/v$(BUILDNUM).tar.gz
+	#rpmbuild
+	$(RPMBUILD) -ba $(RPMBUILD_DIR)/SPECS/$(LIB_BASENAME).spec --define "_topdir $(RPMBUILD_DIR)"
+
 .PHONY : all clean clobber qb_standard copy_headers install uninstall rpm
