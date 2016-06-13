@@ -167,8 +167,12 @@ $(MODULE_DIRS): | $(OBJECT_DIR)
 $(TARGETNAME): $(OBJNAMES) | $(BUILD_DIR)
 ifdef BUILD_WINDOWS
 	$(CPP) $(CPPFLAGS) -shared $(OBJNAMES) $(LIBS) -o $@ 
-else
+else ifdef BUILD_ESX
 	$(CPP) $(CPPFLAGS) -Wl,-rpath,$(ESX_SUPPORT_DIR) -shared $(OBJNAMES) $(LIBS) -Wl,-soname,$(TARGETSO) -o $@
+	cd $(BUILD_DIR); $(RM) $(TARGETSO); $(SOFTLINK) $(TARGET) $(TARGETSO)
+	cd $(BUILD_DIR); $(RM) $(TARGETBASE); $(SOFTLINK) $(TARGET) $(TARGETBASE)
+else ifdef BUILD_LINUX
+	$(CPP) $(CPPFLAGS) -shared $(OBJNAMES) $(LIBS) -Wl,-soname,$(TARGETSO) -o $@
 	cd $(BUILD_DIR); $(RM) $(TARGETSO); $(SOFTLINK) $(TARGET) $(TARGETSO)
 	cd $(BUILD_DIR); $(RM) $(TARGETBASE); $(SOFTLINK) $(TARGET) $(TARGETBASE)
 endif
@@ -213,7 +217,7 @@ uninstall :
 
 rpm :
 	#Make the Directories
-	$(MKDIR) $(RPMBUILD_DIR) $(RPMBUILD_DIR)/BUILD $(RPMBUILD_DIR)/SOURCES $(RPMBUILD_DIR)/RPMS \
+	$(MKDIR) $(RPMBUILD_DIR) $(RPMBUILD_DIR)/BUILD/$(LIB_BASENAME)-$(BUILDNUM) $(RPMBUILD_DIR)/SOURCES $(RPMBUILD_DIR)/RPMS \
 	$(RPMBUILD_DIR)/SRPMS $(RPMBUILD_DIR)/SPECS $(RPMBUILD_DIR)/BUILDROOT \
 	$(RPMBUILD_DIR)/BUILD/$(LIB_BASENAME)-$(BUILDNUM)
 
@@ -223,7 +227,7 @@ rpm :
 	$(SED) -i 's/^%define build_version .*/%define build_version $(BUILDNUM)/g' $(RPMBUILD_DIR)/SPECS/$(LIB_BASENAME).spec
 
 	#Archive the directory
-	git archive --format=tar --prefix="$(LIB_BASENAME)-$(BUILDNUM)/" HEAD | gzip -c > $(RPMBUILD_DIR)/SOURCES/v$(BUILDNUM).tar.gz
+	git archive --format=tar --prefix="$(LIB_BASENAME)-$(BUILDNUM)/" HEAD | gzip -c > $(RPMBUILD_DIR)/SOURCES/$(LIB_BASENAME)-$(BUILDNUM).tar.gz
 	#rpmbuild
 	$(RPMBUILD) -ba $(RPMBUILD_DIR)/SPECS/$(LIB_BASENAME).spec --define "_topdir $(RPMBUILD_DIR)"
 

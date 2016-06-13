@@ -1,34 +1,29 @@
-%define rpm_name libintelnvm-cim
 %define build_version 99.99.99.9999
-%define build_release 1
-%define dname %{rpm_name}-devel
 
-Name:           %{rpm_name}
+Name:           libinvm-cim
 Version:        %{build_version}
-Release:        %{build_release}%{?dist}
+Release:        1%{?dist}
 Summary:        Framework for Intel Storage CIM Binaries
 License:        BSD
 Group:          Development/Libraries
-URL:            https://01.org/intel-nvm-cim-library
-Source:         https://github.com/01org/intelnvmcimlibrary/archive/v%{version}.tar.gz
-
-%define  debug_package %{nil}
+URL:            https://01.org/intel-nvm-cim-library                                                                                                                                                               
+Source:         https://github.com/01org/intelnvmcimlibrary/archive/v%{version}.tar.gz#/%{name}-%{version}.tar.gz
 
 %description
 Framework libraries for the Intel Storage CIM binaries
 
-%package -n %dname
+%package -n %{name}-devel
 Summary:        Development files for %{name}
 License:        BSD
 Group:          Development/Libraries
 Requires:       %{name}%{?_isa} = %{version}-%{release}
 
-%description -n %dname
+%description -n %{name}-devel
 The %{name}-devel package contains header files for
 developing applications that use %{name}.
 
 %prep
-%setup -q -n %{rpm_name}-%{version}
+%setup -q -n %{name}-%{version}
 
 %build
 make BUILDNUM=%{build_version} RELEASE=1
@@ -42,16 +37,16 @@ make install RELEASE=1 RPM_ROOT=%{buildroot} LIB_DIR=%{_libdir} INCLUDE_DIR=%{_i
 
 %files
 %defattr(755,root,root,755)
-%{_libdir}/libintelnvm-cim.so.*
+%{_libdir}/libinvm-cim.so.*
 %license LICENSE
 
-%files -n %dname
+%files -n %{name}-devel
 %defattr(755,root,root,755)
-%{_libdir}/libintelnvm-cim.so
-%dir %{_includedir}/libintelnvm-cim
-%attr(644,root,root) %{_includedir}/libintelnvm-cim/*.h
+%{_libdir}/libinvm-cim.so
+%dir %{_includedir}/libinvm-cim
+%attr(644,root,root) %{_includedir}/libinvm-cim/*.h
 %license LICENSE
 
 %changelog
-* Thu Dec 24 2015 Nicholas Moulin <nicholas.w.moulin@intel.com>
+* Thu Dec 24 2015 Nicholas Moulin <nicholas.w.moulin@intel.com> - 1.0.0.1039-1
 - Initial rpm release
