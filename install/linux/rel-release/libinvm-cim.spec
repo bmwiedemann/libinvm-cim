@@ -3,14 +3,14 @@
 Name:           libinvm-cim
 Version:        %{build_version}
 Release:        1%{?dist}
-Summary:        Framework for Intel Storage CIM Binaries
+Summary:        Framework for Storage CIM Providers
 License:        BSD
 Group:          Development/Libraries
 URL:            https://01.org/intel-nvm-cim-library
 Source:         https://github.com/01org/intelnvmcimlibrary/archive/v%{version}.tar.gz#/%{name}-%{version}.tar.gz
 
 %description
-Framework libraries for the Intel Storage CIM binaries
+Framework libraries supporting storage common information model(CIM) providers.
 
 %package -n %{name}-devel
 Summary:        Development files for %{name}
@@ -26,7 +26,7 @@ developing applications that use %{name}.
 %setup -q -n %{name}-%{version}
 
 %build
-make BUILDNUM=%{build_version} RELEASE=1 CFLAGS_EXTERNAL="%{?cflag}"
+make BUILDNUM=%{build_version} RELEASE=1 CFLAGS_EXTERNAL="%{?optflags}" %{?_smp_mflags}
 
 %install
 make install RELEASE=1 RPM_ROOT=%{buildroot} LIB_DIR=%{_libdir} INCLUDE_DIR=%{_includedir}
