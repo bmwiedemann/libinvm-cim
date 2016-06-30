@@ -130,7 +130,7 @@ ifdef BUILD_WINDOWS
 		-lcomdlg32 -ladvapi32 -lshell32 -lole32 -loleaut32 -luuid \
 		-lodbc32 -lodbccp32 -lwbemuuid -lwbemcore -lwbemupgd
 else ifdef BUILD_LINUX
-	LIBS += -ldl -lm
+	LIBS += -lm
 else ifdef BUILD_ESX
 	LIBS += -ldl -lm
 endif
