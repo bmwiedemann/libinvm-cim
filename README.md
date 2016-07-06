@@ -1,7 +1,7 @@
-#INTELNVMCIMLIBRARY
+#libinvm-cim
 
-Intel NVM CIM Library is a framework library supporting Intel NVM 
-storage common information model (CIM) providers. 
+libinvm-cim is a framework library supporting storage 
+common information model (CIM) providers. 
 
 GNU Make is used to build for Linux and Windows.
 As such we recommend mingw_w64 and msys be used to build in a windows

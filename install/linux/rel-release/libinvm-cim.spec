@@ -7,10 +7,10 @@ Summary:        Framework for Storage CIM Providers
 License:        BSD
 Group:          Development/Libraries
 URL:            https://01.org/intel-nvm-cim-library
-Source:         https://github.com/01org/intelnvmcimlibrary/archive/v%{version}.tar.gz#/%{name}-%{version}.tar.gz
+Source:         https://github.com/01org/libinvm-cim/archive/v%{version}.tar.gz#/%{name}-%{version}.tar.gz
 
 %description
-Framework libraries supporting storage common information model(CIM) providers.
+Framework library supporting storage common information model (CIM) providers.
 
 %package -n %{name}-devel
 Summary:        Development files for %{name}
