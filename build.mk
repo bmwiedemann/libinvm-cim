@@ -136,9 +136,11 @@ ifeq ($(UNAME), Linux)
 		AR = ar
 
 		C_CPP_FLAGS_CMN += -fPIC
-		uname_m = $(shell uname -m)
-		ifeq (,$(findstring arm,$(uname_m)))
-			C_CPP_FLAGS_CMN += -m64
+                uname_m = $(shell uname -m)
+                ifneq (,$(findstring i686,$(uname_m)))
+                        C_CPP_FLAGS_CMN += -m32
+                else ifneq (,$(findstring x86_64,$(uname_m)))
+                        C_CPP_FLAGS_CMN += -m64
 		endif
 		C_CPP_FLAGS_SRC += -D__LINUX__
 
