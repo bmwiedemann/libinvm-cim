@@ -93,7 +93,7 @@ void wbem::framework::CimXml::generateAttributes(const rapidxml::xml_node<> *pIn
 	}
 
 	for (rapidxml::xml_node<> *node = pInstance->first_node(propertyTag.c_str());
-			node; node = node->next_sibling())
+			node; node = node->next_sibling(propertyTag.c_str()))
 	{
 		name = node->first_attribute(CX_NAME.c_str());
 		type = node->first_attribute(CX_TYPE.c_str());
@@ -191,9 +191,11 @@ wbem::framework::Attribute wbem::framework::CimXml::createAttribute(std::string 
 		case UINT64_LIST_T:
 			return Attribute(createList<UINT64>(pValue), isKey);
 		case STR_LIST_T:
+			return Attribute(createList<STR>(pValue), isKey);
+		case BOOLEAN_LIST_T:
+			return Attribute(createList<BOOLEAN>(pValue), isKey);
 		case UINT8_LIST_T:
-			// TODO: If these lists become needed will need to implement this
-			throw ExceptionNotSupported(__FILE__, (char*) __func__);
+			return Attribute(createList<UINT8>(pValue), isKey);
 		case ENUM_T:
 		case ENUM16_T:
 			return Attribute();
@@ -282,6 +284,9 @@ std::string wbem::framework::CimXml::enumToString(enum DataType type)
 		case STR_LIST_T:
 			type = STR_T;
 			break;
+		case BOOLEAN_LIST_T:
+			type = BOOLEAN_T;
+			break;
 		default:
 			break;
 		}
@@ -341,6 +346,9 @@ enum wbem::framework::DataType wbem::framework::CimXml::stringToAttributeType(st
 		case STR_T:
 			type = STR_LIST_T;
 			break;
+		case BOOLEAN_T:
+			type = BOOLEAN_LIST_T;
+			break;
 		default:
 			throw ExceptionBadParameter("string array type");
 		}
@@ -360,11 +368,15 @@ inline T wbem::framework::CimXml::toType(std::string value)
 	{
 		convert >> std::hex >> result;
 	}
+	else if (StringUtil::stringCompareIgnoreCase(value, CX_TRUE) ||
+			 StringUtil::stringCompareIgnoreCase(value, CX_FALSE))
+	{
+		convert >> std::boolalpha >> result;
+	}
 	else
 	{
 		convert >> result;
 	}
-
 	return result;
 }
 

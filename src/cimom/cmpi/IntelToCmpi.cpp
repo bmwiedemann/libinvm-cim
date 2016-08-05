@@ -332,6 +332,25 @@ void intelToCmpi(const CMPIBroker *pBroker, wbem::framework::Attribute *pAttribu
 			}
 			break;
 		}
+		case wbem::framework::BOOLEAN_LIST_T:
+		{
+			pCmpiAttribute->value.array = CMNewArray(pBroker, pAttribute->booleanListValue().size(), CMPI_boolean, pStatus);
+			if (pStatus->rc == CMPI_RC_OK)
+			{
+				pCmpiAttribute->type = CMPI_booleanA;
+				for (int i = 0; i < (int)pAttribute->booleanListValue().size(); i++)
+				{
+					CMPIValue value;
+					value.boolean = pAttribute->booleanListValue().at(i);
+					pCmpiAttribute->value.array->ft->setElementAt(pCmpiAttribute->value.array, i, &value, CMPI_boolean);
+				}
+			}
+			else
+			{
+				COMMON_LOG_ERROR_F("CMPI error converting a BOOLEAN_LIST to a CMPI boolean array. Error %d", pStatus->rc);
+			}
+			break;
+		}
 		default:
 			COMMON_LOG_ERROR("Tried to convert an attribute with an invalid data type");
 			CMSetStatus(pStatus, CMPI_RC_ERR_INVALID_DATA_TYPE)
@@ -519,6 +538,32 @@ wbem::framework::Attribute* cmpiToIntel(CMPIData *pCmpiAttribute, bool isKey, CM
 			}
 			break;
 		}
+		case CMPI_booleanA      :
+		{
+			// TODO: This implementation is untested. When a class with a boolean[] is implemented, pay special attention to this code
+			std::vector<BOOLEAN> list;
+			int size = CMGetArrayCount(pCmpiAttribute->value.array, pStatus);
+			if (pStatus->rc == CMPI_RC_OK)
+			{
+				for (int i = 0; i < size; i++)
+				{
+					CMPIStatus tempStatus;
+					CMPIData data = CMGetArrayElementAt(pCmpiAttribute->value.array, i, &tempStatus);
+					KEEP_ERR(*pStatus, tempStatus);
+					if (tempStatus.rc == CMPI_RC_OK)
+					{
+						list.push_back(data.value.boolean);
+					}
+				}
+			}
+			if (pStatus->rc != CMPI_RC_OK)
+			{
+				COMMON_LOG_ERROR_F("CMPI error converting a CMPI boolean array to a BOOLEAN_LIST. Error %d", pStatus->rc);
+			}
+			// create even if there's an error (it will just be empty)
+			pResult = new wbem::framework::Attribute(list, isKey);
+			break;
+		}
 		case CMPI_refA         :
 		{
 			std::vector<std::string> list;
@@ -561,7 +606,6 @@ wbem::framework::Attribute* cmpiToIntel(CMPIData *pCmpiAttribute, bool isKey, CM
 		case CMPI_dateTime     :
 		case CMPI_ptr          :
 		case CMPI_charsptr     :
-		case CMPI_booleanA     :
 		case CMPI_char16A      :
 		case CMPI_real32A      :
 		case CMPI_real64A      :

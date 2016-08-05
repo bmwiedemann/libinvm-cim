@@ -76,6 +76,7 @@ enum DataType
 	UINT32_LIST_T,//!< Vector of unsigned 32 bit integers.
 	UINT64_LIST_T,//!< Vector of unsigned 64 bit integers.
 	STR_LIST_T,   //!< Vector of strings.
+	BOOLEAN_LIST_T,//!< Vector of booleans.
 	ENUM_T,       //!< Enumeration meaning a string and an integer.
 	ENUM16_T,	  //!< Enumeration with the integer as a uint16
 	DATETIME_T,	//!< datetime
@@ -304,6 +305,15 @@ class Attribute
 		Attribute(STR_LIST values, bool isKey);
 
 		/*!
+		 * Constructor for a vector of booleans attribute.
+		 * @param[in] values
+		 * 		The list of values to initialize the attribute to.
+		 * @param[in] isKey
+		 * 		True if this attribute is a key of the Instance.
+		 */
+		Attribute(BOOLEAN_LIST values, bool isKey);
+
+		/*!
 		 * Constructor for an enumeration attribute.
 		 * @param[in] enumValue
 		 * 		The value to initialize the attribute to.
@@ -447,6 +457,12 @@ class Attribute
 		STR_LIST strListValue() const;
 
 		/*!
+		 * Retrieve the list of string attribute values.
+		 * @return The attribute values or an empty list if not type NVM_BOOLEAN_LIST_T.
+		 */
+		BOOLEAN_LIST booleanListValue() const;
+
+		/*!
 		 * Retrieve the attribute type.
 		 * @return The attribute type enumeration value.
 		 */
@@ -498,6 +514,7 @@ private:
 		UINT32_LIST m_UInt32List;
 		UINT64_LIST m_UInt64List;
 		STR_LIST m_StrList;
+		BOOLEAN_LIST m_BooleanList;
 
 		/*
 		 * Helper function to compare lists of values

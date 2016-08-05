@@ -101,6 +101,9 @@ wbem::framework::Attribute::Attribute(const wbem::framework::Attribute &attribut
 		case STR_LIST_T:
 			m_StrList = attribute.m_StrList;
 			break;
+		case BOOLEAN_LIST_T:
+			m_BooleanList = attribute.m_BooleanList;
+			break;
 		case ENUM16_T:
 			m_Str = attribute.m_Str;
 			m_Value.uint16 = attribute.m_Value.uint16;
@@ -325,6 +328,15 @@ wbem::framework::Attribute::Attribute(STR_LIST values, bool isKey)
 { 
 	m_Type = STR_LIST_T; 
 	m_StrList = values;
+	m_IsKey = isKey;
+	m_IsEmbedded = false;
+	m_IsAssociationClassInstance = false;
+}
+
+wbem::framework::Attribute::Attribute(BOOLEAN_LIST values, bool isKey)
+{
+	m_Type = BOOLEAN_LIST_T;
+	m_BooleanList = values;
 	m_IsKey = isKey;
 	m_IsEmbedded = false;
 	m_IsAssociationClassInstance = false;
@@ -700,7 +712,6 @@ wbem::framework::UINT64_LIST wbem::framework::Attribute::uint64ListValue() const
 	return result;
 }
 
-
 wbem::framework::STR_LIST wbem::framework::Attribute::strListValue() const
 { 
 	STR_LIST result; 
@@ -714,6 +725,20 @@ wbem::framework::STR_LIST wbem::framework::Attribute::strListValue() const
 	} 
 	return result; 
 } 
+
+wbem::framework::BOOLEAN_LIST wbem::framework::Attribute::booleanListValue() const
+{
+	BOOLEAN_LIST result;
+	if (m_Type == BOOLEAN_LIST_T)
+	{
+		result = m_BooleanList;
+	}
+	else
+	{
+		COMMON_LOG_ERROR("Invalid type.");
+	}
+	return result;
+}
 
 wbem::framework::Attribute& wbem::framework::Attribute::operator=(const Attribute& rhs)
 {
@@ -779,6 +804,9 @@ wbem::framework::Attribute& wbem::framework::Attribute::operator=(const Attribut
 		case STR_LIST_T:
 			m_StrList = rhs.m_StrList;
 			break;
+		case BOOLEAN_LIST_T:
+			m_BooleanList = rhs.m_BooleanList;
+			break;
 		case ENUM16_T:
 			m_Str = rhs.m_Str;
 			m_Value.uint16 = rhs.m_Value.uint16;
@@ -841,7 +869,7 @@ std::string wbem::framework::Attribute::asStr(std::string prefix, std::string su
 			result << m_Value.real32;
 			break;
 		case BOOLEAN_T:
-			result << (m_Value.boolean ? "True" : "False");
+			result << (m_Value.boolean ? "true" : "false");
 			break;
 		case UINT8_LIST_T:
 			for (unsigned int i = 0; i < m_UInt8List.size(); i++)
@@ -891,6 +919,16 @@ std::string wbem::framework::Attribute::asStr(std::string prefix, std::string su
 					result << suffix << sep << prefix;
 				}
 				result << m_StrList[i];
+			}
+			break;
+		case BOOLEAN_LIST_T:
+			for (unsigned int i = 0; i < m_BooleanList.size(); i++)
+			{
+				if (i > 0)
+				{
+					result << suffix << sep << prefix;
+				}
+				result << (m_BooleanList[i] ? "true" : "false");
 			}
 			break;
 		case DATETIME_T:
@@ -955,6 +993,7 @@ bool wbem::framework::Attribute::isArray() const
 	case UINT32_LIST_T:
 	case UINT64_LIST_T:
 	case STR_LIST_T:
+	case BOOLEAN_LIST_T:
 		result = true;
 		break;
 	default:
@@ -1070,6 +1109,9 @@ bool wbem::framework::Attribute::operator==(const Attribute& rhs) const
 				break;
 			case STR_LIST_T:
 				result = listEqual(this->m_StrList, rhs.strListValue());
+				break;
+			case BOOLEAN_LIST_T:
+				result = listEqual(this->m_BooleanList, rhs.booleanListValue());
 				break;
 			default:
 				result = false;

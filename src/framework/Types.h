@@ -68,6 +68,7 @@ typedef std::vector<UINT16> UINT16_LIST; //!< A vector of 16 bit unsigned intege
 typedef std::vector<UINT32> UINT32_LIST; //!< A vector of 32 bit unsigned integers.
 typedef std::vector<UINT64> UINT64_LIST; //!< A vector of 64 bit unsigned integers.
 typedef std::vector<STR> STR_LIST; //!< A vector of strings.
+typedef std::vector<BOOLEAN> BOOLEAN_LIST; //!< A vector of booleans.
 
 }
 }
