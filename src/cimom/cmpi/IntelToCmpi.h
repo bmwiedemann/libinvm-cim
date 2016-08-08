@@ -99,5 +99,23 @@ wbem::framework::Attribute* cmpiToIntel(CMPIData *pCmpiAttribute, bool isKey, CM
  */
 void cmpiToIntel(const CMPIObjectPath *pCmpiObjectPath, wbem::framework::ObjectPath *pObjectPath, CMPIStatus *pRc);
 
+/*!
+ * Convert a CMPI Instance to an Instance
+ * @param[in] pCmpiObjectPath
+ * @param[in] pCmpiInstance
+ * @param[out] pRc
+ * @return
+ *		Returns a new instance
+ */
+wbem::framework::Instance *cmpiToIntel(const CMPIObjectPath *pCmpiObjectPath, const CMPIInstance *pCmpiInstance, CMPIStatus *pRc);
+
+/*!
+ * Check if attribute exists and is a key attribute
+ * @param[in] pNewInstance
+ * @param[in] key
+ * @return
+ *		Returns true if attribute exists and is key
+ */
+bool isAttributeKey(wbem::framework::Instance *pNewInstance, std::string attributeName);
 }
 }

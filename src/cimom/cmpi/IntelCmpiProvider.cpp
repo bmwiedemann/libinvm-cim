@@ -317,6 +317,29 @@ CMPIStatus Generic_CreateInstance
 }
 
 /*
+ * Get Provider instance
+ */
+wbem::framework::attributes_t getModifiedAttributes(wbem::framework::Instance *pCurrentInstance, wbem::framework::Instance *pNewInstance)
+{
+	LogEnterExit logging(__FILE__, __FUNCTION__, __LINE__);
+	wbem::framework::attributes_t attributes;
+	wbem::framework::attributes_t::const_iterator propIter = pNewInstance->attributesBegin();
+	for (; propIter != pNewInstance->attributesEnd(); propIter++)
+	{
+		std::string key = (*propIter).first;
+		wbem::framework::Attribute modifiedInstProp = (*propIter).second;
+		wbem::framework::Attribute currInstProp;
+		pCurrentInstance->getAttribute(key, currInstProp);
+
+		if (currInstProp != modifiedInstProp)
+		{
+			attributes[key] = modifiedInstProp;
+		}
+	}
+	return attributes;
+}
+
+/*
  * Replace an existing instance using an object path as reference
  */
 CMPIStatus Generic_ModifyInstance(
@@ -327,98 +350,69 @@ CMPIStatus Generic_ModifyInstance(
 	LogEnterExit logging(__FILE__, __FUNCTION__, __LINE__);
 	CMPIStatus status;
 
-	CMPICount count = CMGetPropertyCount(pCmpiInstance, &status);
+	wbem::framework::ObjectPath objectPath;
+	cmpiToIntel(pCmpiObjectPath, &objectPath, &status);
+
 	if (status.rc == CMPI_RC_OK)
 	{
-		wbem::framework::attributes_t attributes;
-		for (CMPICount i = 0; i < count; i++)
+		wbem::framework::InstanceFactory *pProvider = ProviderFactory::getInstanceFactoryStatic(
+				objectPath.getClass());
+		if (pProvider != NULL)
 		{
-			CMPIString *pName;
-			CMPIStatus tempStatus;
-			CMPIData property = CMGetPropertyAt(pCmpiInstance, i, &pName, &tempStatus);
-			KEEP_ERR(status, tempStatus);
-			if (tempStatus.rc == CMPI_RC_OK)
+			// With the Intel object path get the Intel Instance
+			wbem::framework::attribute_names_t attributenames;
+			wbem::framework::Instance *pCurrentInstance = NULL;
+			wbem::framework::Instance *pNewInstance = NULL;
+			wbem::framework::Instance *pModifiedInstance = NULL;
+			try
 			{
-				char *name = CMGetCharPtr(pName);
-				if (property.state == CMPI_goodValue)
-				{
-					wbem::framework::Attribute *pAttribute = cmpiToIntel(&property, false, &tempStatus);
-					KEEP_ERR(status, tempStatus);
-					if (tempStatus.rc == CMPI_RC_OK && pAttribute != NULL)
-					{
-						attributes[name] = *pAttribute;
-					}
-					if (pAttribute != NULL)
-					{
-						delete (pAttribute);
-					}
-				}
-			}
-		}
 
-		if (status.rc == CMPI_RC_OK) // make sure no errors so far
-		{
-			wbem::framework::ObjectPath objectPath;
+				pCurrentInstance = pProvider->getInstance(objectPath, attributenames);
+				pNewInstance = cmpiToIntel(pCmpiObjectPath, pCmpiInstance, &status);
 
-			cmpiToIntel(pCmpiObjectPath, &objectPath, &status);
-			if (status.rc == CMPI_RC_OK)
-			{
-				wbem::framework::InstanceFactory *pProvider = ProviderFactory::getInstanceFactoryStatic(objectPath.getClass());
-				if (pProvider != NULL)
+				if (status.rc == CMPI_RC_OK) // make sure no errors so far
 				{
-					wbem::framework::Instance *pNewInstance = NULL;
-					try
+					wbem::framework::attributes_t attributes;
+
+					attributes = getModifiedAttributes(pCurrentInstance, pNewInstance);
+					pModifiedInstance = pProvider->modifyInstance(objectPath, attributes);
+					if (pModifiedInstance != NULL)
 					{
-						pNewInstance = pProvider->modifyInstance(objectPath, attributes);
-						if (pNewInstance != NULL)
+						CMPIInstance *pNewCmpiInstance = intelToCmpi(g_pBroker, pModifiedInstance, &status);
+						if (status.rc == CMPI_RC_OK)
 						{
-							CMPIInstance *pNewCmpiInstance = intelToCmpi(g_pBroker, pNewInstance, &status);
-							if (status.rc == CMPI_RC_OK)
-							{
-								CMReturnInstance(pResult, pNewCmpiInstance);
-							}
+							CMReturnInstance(pResult, pNewCmpiInstance);
 						}
 					}
-					catch(wbem::framework::ExceptionBadParameter &e)
-					{
-						CMSetStatusWithChars(g_pBroker, &status, CMPI_RC_ERR_INVALID_PARAMETER,
-								e.what());
-					}
-					catch(wbem::framework::ExceptionSystemError &e)
-					{
-						CMSetStatusWithChars(g_pBroker, &status, CMPI_RC_ERROR_SYSTEM, e.what());
-					}
-					catch(wbem::framework::ExceptionNoMemory &e)
-					{
-						CMSetStatusWithChars(g_pBroker, &status, CMPI_RC_ERROR_SYSTEM,
-								"System ran out of memory");
-					}
-					catch(wbem::framework::ExceptionNotSupported &e)
-					{
-						CMSetStatusWithChars(g_pBroker, &status, CMPI_RC_ERR_NOT_SUPPORTED,
-								e.what());
-					}
-					catch(wbem::framework::Exception &e)
-					{
-						CMSetStatusWithChars(g_pBroker, &status, CMPI_RC_ERR_FAILED,
-								e.what());
-					}
 
-					if (pNewInstance != NULL)
-					{
-						delete (pNewInstance);
-					}
-				}
-				if (pProvider != NULL)
-				{
-					delete (pProvider);
 				}
 			}
+			catch(wbem::framework::ExceptionBadParameter &e)
+			{
+				CMSetStatusWithChars(g_pBroker, &status, CMPI_RC_ERR_INVALID_PARAMETER, e.what());
+			}
+			catch(wbem::framework::ExceptionSystemError &e)
+			{
+				CMSetStatusWithChars(g_pBroker, &status, CMPI_RC_ERROR_SYSTEM, e.what());
+			}
+			catch(wbem::framework::ExceptionNoMemory &e)
+			{
+				CMSetStatusWithChars(g_pBroker, &status, CMPI_RC_ERROR_SYSTEM,
+						"System ran out of memory");
+			}
+			catch(wbem::framework::ExceptionNotSupported &e)
+			{
+				CMSetStatusWithChars(g_pBroker, &status, CMPI_RC_ERR_NOT_SUPPORTED, e.what());
+			}
+			catch(wbem::framework::Exception &e)
+			{
+				CMSetStatusWithChars(g_pBroker, &status, CMPI_RC_ERROR, e.what());
+			}
+			delete (pNewInstance);
+			delete (pCurrentInstance);
+			delete (pModifiedInstance);
 		}
-	}
-	else
-	{
-		COMMON_LOG_ERROR("Unable to get property count");
+		delete (pProvider);
 	}
 
 	CMReturnDone (pResult);

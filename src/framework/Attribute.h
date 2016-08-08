@@ -58,7 +58,7 @@ enum DatetimeSubtype
 /*!
  * The data type of the attribute.
  */
-enum DataType 
+enum DataType
 {
 	BOOLEAN_T,    //!< Boolean.
 	UINT8_T,      //!< Unsigned 8 bit integer.
@@ -481,12 +481,14 @@ class Attribute
 	bool isEmbedded();
 
 	void setIsEmbedded(bool value);
-	
+
 	bool isAssociationClassInstance();
 
 	void setIsAssociationClassInstance(bool value);
 
 	void setIsKey(bool isKey);
+
+	static bool typesMatch(enum DataType lhs, enum DataType rhs);
 
 private:
 		union attribute_t

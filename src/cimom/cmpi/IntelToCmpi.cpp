@@ -361,6 +361,69 @@ void intelToCmpi(const CMPIBroker *pBroker, wbem::framework::Attribute *pAttribu
 
 }
 
+// check if attribute exists and is a key attribute
+bool isAttributeKey(wbem::framework::Instance *pNewInstance, std::string attributeName)
+{
+	bool isKey = false;
+	wbem::framework::Attribute attribute;
+	if ((pNewInstance->getAttribute(attributeName, attribute) == wbem::framework::SUCCESS) && attribute.isKey())
+	{
+		isKey = true;
+	}
+	return isKey;
+}
+
+// Take a CMPI Instance and create a new Instance
+wbem::framework::Instance *cmpiToIntel(const CMPIObjectPath *pCmpiObjectPath, const CMPIInstance *pCmpiInstance,
+		CMPIStatus *pStatus)
+{
+	LogEnterExit logging(__FILE__, __FUNCTION__, __LINE__);
+	CMPICount count = CMGetPropertyCount(pCmpiInstance,pStatus);
+	wbem::framework::Instance *pNewInstance = NULL;
+
+	if (pStatus->rc == CMPI_RC_OK)
+	{
+		wbem::framework::ObjectPath newInstanceObjPath;
+		cmpiToIntel(pCmpiObjectPath, &newInstanceObjPath, pStatus);
+		pNewInstance = new wbem::framework::Instance(newInstanceObjPath);
+
+		for (CMPICount i = 0; i < count; i++)
+		{
+			CMPIString *pName;
+			CMPIStatus tempStatus;
+			bool isKey = false;
+
+			CMPIData cmpiInstanceProp = CMGetPropertyAt(pCmpiInstance, i, &pName, &tempStatus);
+			KEEP_ERR(*pStatus, tempStatus);
+
+			if (tempStatus.rc == CMPI_RC_OK)
+			{
+				char *name = CMGetCharPtr(pName);
+				std::string attributeName(name);
+				if (cmpiInstanceProp.state == CMPI_goodValue)
+				{
+					// Get attribute and check if the attribute is a key
+					isKey = isAttributeKey(pNewInstance, attributeName);
+					wbem::framework::Attribute *pAttribute = cmpiToIntel(&cmpiInstanceProp, isKey, &tempStatus);
+					KEEP_ERR(*pStatus, tempStatus);
+
+					if (tempStatus.rc == CMPI_RC_OK && pAttribute != NULL)
+					{
+						pNewInstance->setAttribute(attributeName, *pAttribute);
+					}
+					delete (pAttribute);
+				}
+			}
+		}
+	}
+	else
+	{
+		COMMON_LOG_ERROR("Unable to get property count");
+	}
+
+	return pNewInstance;
+}
+
 // Take a CMPI Attribute and create a new Attribute
 wbem::framework::Attribute* cmpiToIntel(CMPIData *pCmpiAttribute, bool isKey, CMPIStatus *pStatus)
 {
@@ -383,6 +446,8 @@ wbem::framework::Attribute* cmpiToIntel(CMPIData *pCmpiAttribute, bool isKey, CM
 		switch(pCmpiAttribute->type)
 		{
 		case CMPI_boolean      :
+			pResult =  new wbem::framework::Attribute((bool)pCmpiAttribute->value.boolean, isKey);
+			break;
 		case CMPI_char16       :
 			pResult =  new wbem::framework::Attribute(pCmpiAttribute->value.char16, isKey);
 			break;
@@ -507,11 +572,20 @@ wbem::framework::Attribute* cmpiToIntel(CMPIData *pCmpiAttribute, bool isKey, CM
 					KEEP_ERR(*pStatus, tempStatus);
 					if (tempStatus.rc == CMPI_RC_OK)
 					{
-						const char *value = CMGetCharsPtr(data.value.string, &tempStatus);
-						KEEP_ERR(*pStatus, tempStatus);
-						if (tempStatus.rc == CMPI_RC_OK)
+						if (data.value.string != NULL)
 						{
-							list.push_back(value);
+							const char *value = CMGetCharsPtr(data.value.string, &tempStatus);
+							KEEP_ERR(*pStatus, tempStatus);
+							if (tempStatus.rc == CMPI_RC_OK)
+							{
+								std::string valueStr(value);
+								list.push_back(valueStr);
+							}
+						}
+						else
+						{
+							std::string valueStr = "";
+							list.push_back(valueStr);
 						}
 					}
 				}
@@ -595,6 +669,14 @@ wbem::framework::Attribute* cmpiToIntel(CMPIData *pCmpiAttribute, bool isKey, CM
 			pResult = new wbem::framework::Attribute(list, isKey);
 			break;
 		}
+		case CMPI_dateTime     :
+		{
+				CMPIString *cmpiDateTime = CMGetStringFormat(pCmpiAttribute->value.dateTime, pStatus);
+				const char *dateTime = CMGetCharsPtr(cmpiDateTime, pStatus);
+				pResult = new wbem::framework::Attribute(dateTime,
+						wbem::framework::DATETIME_SUBTYPE_DATETIME, isKey);
+				break;
+		}
 		// current unsupported types
 		case CMPI_real32       :
 		case CMPI_real64       :
@@ -603,7 +685,6 @@ wbem::framework::Attribute* cmpiToIntel(CMPIData *pCmpiAttribute, bool isKey, CM
 		case CMPI_filter       :
 		case CMPI_enumeration  :
 		case CMPI_chars        :
-		case CMPI_dateTime     :
 		case CMPI_ptr          :
 		case CMPI_charsptr     :
 		case CMPI_char16A      :

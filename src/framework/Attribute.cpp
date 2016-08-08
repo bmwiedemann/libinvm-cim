@@ -239,8 +239,6 @@ wbem::framework::Attribute::Attribute(const char *value, enum DatetimeSubtype ty
 	}
 	else // string format not valid
 	{
-		COMMON_LOG_ERROR_F("bad value for datetime: %s (type: %d), expected type: %d",
-				value, strType, type);
 		throw ExceptionBadParameter("value");
 	}
 	m_IsEmbedded = false;
@@ -324,9 +322,9 @@ wbem::framework::Attribute::Attribute(UINT64_LIST values, bool isKey)
 	m_IsAssociationClassInstance = false;
 }
 
-wbem::framework::Attribute::Attribute(STR_LIST values, bool isKey) 
-{ 
-	m_Type = STR_LIST_T; 
+wbem::framework::Attribute::Attribute(STR_LIST values, bool isKey)
+{
+	m_Type = STR_LIST_T;
 	m_StrList = values;
 	m_IsKey = isKey;
 	m_IsEmbedded = false;
@@ -684,7 +682,7 @@ wbem::framework::UINT16_LIST wbem::framework::Attribute::uint16ListValue() const
 	return result;
 }
 
-wbem::framework::UINT32_LIST wbem::framework::Attribute::uint32ListValue() const 
+wbem::framework::UINT32_LIST wbem::framework::Attribute::uint32ListValue() const
 {
 	UINT32_LIST result;
 	if (m_Type == UINT32_LIST_T)
@@ -713,18 +711,18 @@ wbem::framework::UINT64_LIST wbem::framework::Attribute::uint64ListValue() const
 }
 
 wbem::framework::STR_LIST wbem::framework::Attribute::strListValue() const
-{ 
-	STR_LIST result; 
-	if (m_Type == STR_LIST_T) 
-	{ 
-		result = m_StrList; 
-	} 
-	else 
-	{ 
+{
+	STR_LIST result;
+	if (m_Type == STR_LIST_T)
+	{
+		result = m_StrList;
+	}
+	else
+	{
 		COMMON_LOG_ERROR("Invalid type.");
-	} 
-	return result; 
-} 
+	}
+	return result;
+}
 
 wbem::framework::BOOLEAN_LIST wbem::framework::Attribute::booleanListValue() const
 {
@@ -1053,7 +1051,7 @@ bool wbem::framework::Attribute::operator==(const Attribute& rhs) const
 	bool rhsIsKey = rhs.isKey();
 	bool lhsIsKey = this->m_IsKey;
 
-	if ((rhsType != lhsType) || (rhsIsKey != lhsIsKey))
+	if (!(typesMatch(lhsType, rhsType)) || (rhsIsKey != lhsIsKey))
 	{
 		result = false;
 	}
@@ -1120,6 +1118,29 @@ bool wbem::framework::Attribute::operator==(const Attribute& rhs) const
 	}
 	return result;
 }
+
+bool wbem::framework::Attribute::typesMatch(enum DataType lhs, enum DataType rhs)
+{
+	bool match = false;
+
+	if (lhs == rhs)
+	{
+		match = true;
+	}
+	else
+	{
+		if ((lhs == ENUM_T) || (lhs == UINT8_T))
+		{
+			match = ((rhs == ENUM_T) || (rhs == UINT8_T));
+		}
+		else if ((lhs == ENUM16_T) || (lhs == UINT16_T))
+		{
+			match = ((rhs == ENUM16_T) || (rhs == UINT16_T));
+		}
+	}
+	return match;
+}
+
 
 bool wbem::framework::Attribute::isEmbedded()
 {
