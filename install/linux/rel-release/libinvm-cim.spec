@@ -8,6 +8,7 @@ License:        BSD
 Group:          Development/Libraries
 URL:            https://01.org/intel-nvm-cim-library
 Source:         https://github.com/01org/libinvm-cim/archive/v%{version}.tar.gz#/%{name}-%{version}.tar.gz
+ExclusiveArch:  x86_64
 
 %description
 Framework library supporting storage common information model (CIM) providers.
@@ -47,5 +48,5 @@ make install RELEASE=1 RPM_ROOT=%{buildroot} LIB_DIR=%{_libdir} INCLUDE_DIR=%{_i
 %license LICENSE
 
 %changelog
-* Thu Dec 24 2015 Nicholas Moulin <nicholas.w.moulin@intel.com> - 1.0.0.1041-1
+* Thu Dec 24 2015 Nicholas Moulin <nicholas.w.moulin@intel.com> - 1.0.0.1043-1
 - Initial rpm release
