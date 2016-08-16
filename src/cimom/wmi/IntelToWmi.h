@@ -64,6 +64,8 @@ public:
 	static wbem::framework::STR_LIST toStrList(VARIANT& v);
 	static enum wbem::framework::DatetimeSubtype getDatetimeSubtype(std::string datetime);
 	static wbem::framework::Attribute *ToIntelAttribute(VARIANT& v, CIMTYPE &cimType);
+	static HRESULT STDMETHODCALLTYPE ToIntelInstance(framework::ObjectPath &path,
+			wbem::framework::Instance &newInstance,IWbemClassObject __RPC_FAR* pInst );
 };
 
 }

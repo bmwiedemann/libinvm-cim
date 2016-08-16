@@ -180,6 +180,105 @@ SCODE wbem::wmi::IntelToWmi::ToWmiInstance(wbem::framework::Instance *pInstance,
 }
 
 /*
+ * Helper method to build c++ object path from path string
+ */
+HRESULT STDMETHODCALLTYPE buildObjectPath(std::string objPathString, wbem::framework::ObjectPath &path)
+{
+	LogEnterExit logging(__FILE__, __FUNCTION__, __LINE__);
+
+	HRESULT result = WBEM_NO_ERROR;
+
+	if (!objPathString.empty())
+	{
+		wbem::framework::ObjectPathBuilder builder(objPathString);
+		builder.Build(&path);
+	}
+	else
+	{
+		COMMON_LOG_ERROR("Did not find __Path attribute to build ObjectPath with");
+		result = WBEM_E_FAILED;
+	}
+	return result;
+}
+/*
+ * Utility methods for converting c++ WMI/WBEM classes to c++ classes
+ * path - the object path of the WMI instance converted to c++ instance
+ * newInstance - the new instance being created
+ * pInst - this points to the WMI instance being converted
+ */
+HRESULT STDMETHODCALLTYPE wbem::wmi::IntelToWmi::ToIntelInstance(wbem::framework::ObjectPath &path,
+		wbem::framework::Instance &newInstance, IWbemClassObject __RPC_FAR* pInst )
+{
+	LogEnterExit logging(__FILE__, __FUNCTION__, __LINE__);
+	HRESULT result = WBEM_NO_ERROR;
+
+	// check used parameters
+	if (pInst == NULL)
+	{
+		result = WBEM_E_INVALID_PARAMETER;
+	}
+	else
+	{
+		BSTR bName; // used to get name of attribute
+		VARIANT val; // WMI attribute
+		CIMTYPE type; // WMI attribute type
+
+		// convert WMI Instance to list of Attributes by iterating over pInst attributes
+		wbem::framework::attributes_t attributes;
+		pInst->BeginEnumeration(0);
+		std::string objectPathString; // used to get string object path (in __Path)
+
+		while (pInst->Next(0, &bName, &val, &type, NULL) != WBEM_S_NO_MORE_DATA)
+		{
+			char *name = _com_util::ConvertBSTRToString(bName);
+			if (name != NULL)
+			{
+				wbem::framework::Attribute *pAttribute = IntelToWmi::ToIntelAttribute(val, type);
+
+				if (pAttribute != NULL)
+				{
+					if (std::string(name) == "__PATH")
+					{
+						objectPathString = pAttribute->stringValue();
+						result = buildObjectPath(objectPathString, path);
+					}
+					attributes[name] = *pAttribute;
+					delete pAttribute;
+				}
+				else
+				{
+					COMMON_LOG_ERROR_F("WMI Variant %s was not converted to an Attribute.",
+							name);
+					result = WBEM_E_FAILED;
+				}
+			}
+			else
+			{
+				COMMON_LOG_ERROR("Could not get Attribute name from BSTR");
+			}
+		}
+
+		if (result == WBEM_NO_ERROR)
+		{
+			newInstance = wbem::framework::Instance(path);
+			wbem::framework::attributes_t keys = path.getKeys();
+			wbem::framework::attributes_itr_t attr_iter = attributes.begin();
+
+			for (;attr_iter != attributes.end(); attr_iter++)
+			{
+				if (keys.find(attr_iter->first) != keys.end())
+				{
+					attr_iter->second.setIsKey(true);
+				}
+
+				newInstance.setAttribute(attr_iter->first, attr_iter->second);
+			}
+		}
+	}
+	return result;
+}
+
+/*
  * Helper method to convert an Attribute to a WMI Variant
  */
 HRESULT STDMETHODCALLTYPE wbem::wmi::IntelToWmi::ToWmiAttribute(wbem::framework::Attribute &attribute, VARIANT &v )
@@ -409,6 +508,7 @@ enum wbem::framework::DatetimeSubtype wbem::wmi::IntelToWmi::getDatetimeSubtype(
  */
 wbem::framework::Attribute *wbem::wmi::IntelToWmi::ToIntelAttribute(VARIANT& v, CIMTYPE &cimType)
 {
+	LogEnterExit logging(__FILE__, __FUNCTION__, __LINE__);
 	COMMON_LOG_DEBUG_F("CIM Type: %d", (int)cimType);
 
 	if (v.vt == VT_EMPTY || v.vt == VT_NULL)

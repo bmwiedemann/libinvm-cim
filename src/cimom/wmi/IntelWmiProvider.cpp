@@ -168,7 +168,7 @@ STDMETHODIMP_(ULONG) wbem::wmi::IntelWmiProvider::Release(void)
  *
  */
 STDMETHODIMP wbem::wmi::IntelWmiProvider::Initialize(
-		LPWSTR pszUser, LONG lFlags, LPWSTR pszNamespace, 
+		LPWSTR pszUser, LONG lFlags, LPWSTR pszNamespace,
 		LPWSTR pszLocale, IWbemServices *pNamespace,
 		IWbemContext *pCtx, IWbemProviderInitSink *pInitSink)
 {
@@ -206,9 +206,9 @@ STDMETHODIMP wbem::wmi::IntelWmiProvider::Initialize(
  *	Purpose: Asynchronously enumerates the instances.
  */
 SCODE wbem::wmi::IntelWmiProvider::CreateInstanceEnumAsync(
-		const BSTR RefStr, long lFlags, IWbemContext *pCtx, 
+		const BSTR RefStr, long lFlags, IWbemContext *pCtx,
 		IWbemObjectSink FAR* pHandler)
-{		
+{
 	LogEnterExit logging(__FILE__, __FUNCTION__, __LINE__);
 	SCODE sc = S_OK;
 	char *mofClass;
@@ -314,7 +314,7 @@ SCODE wbem::wmi::IntelWmiProvider::CreateInstanceEnumAsync(
 /*
  * Creates an instance given a particular path value.
  */
-SCODE wbem::wmi::IntelWmiProvider::GetObjectAsync(const BSTR ObjectPath, long lFlags, 
+SCODE wbem::wmi::IntelWmiProvider::GetObjectAsync(const BSTR ObjectPath, long lFlags,
 		IWbemContext  *pCtx, IWbemObjectSink FAR* pHandler)
 {
 	LogEnterExit logging(__FILE__, __FUNCTION__, __LINE__);
@@ -597,6 +597,30 @@ HRESULT wbem::wmi::IntelWmiProvider::ExecMethodAsync(const BSTR strObjectPath,
 }
 
 /*
+ * helper to get modified attributes
+ */
+wbem::framework::attributes_t getModifiedAttributes(wbem::framework::Instance *pCurrentInstance, wbem::framework::Instance *pNewInstance)
+{
+    LogEnterExit logging(__FILE__, __FUNCTION__, __LINE__);
+
+    wbem::framework::attributes_t attributes;
+    wbem::framework::attributes_t::const_iterator propIter = pCurrentInstance->attributesBegin();
+    for (; propIter != pCurrentInstance->attributesEnd(); propIter++)
+    {
+        std::string key = (*propIter).first;
+        wbem::framework::Attribute modifiedInstProp;
+        pNewInstance->getAttribute(key, modifiedInstProp);
+        wbem::framework::Attribute currInstProp = (*propIter).second;
+
+        if (currInstProp != modifiedInstProp)
+        {
+            attributes[key] = modifiedInstProp;
+        }
+    }
+    return attributes;
+}
+
+/*
  * Modify Instance
  */
 HRESULT STDMETHODCALLTYPE wbem::wmi::IntelWmiProvider::PutInstanceAsync(
@@ -619,98 +643,48 @@ HRESULT STDMETHODCALLTYPE wbem::wmi::IntelWmiProvider::PutInstanceAsync(
 	}
 	else
 	{
-		BSTR bName; // used to get name of attribute
-		VARIANT val; // WMI attribute
-		CIMTYPE type; // WMI attribute type
+		wbem::framework::Instance newInstance;
+		wbem::framework::attribute_names_t attributenames;
+		wbem::framework::ObjectPath path;
+		wbem::framework::attributes_t modifiedAttributes;
 
+		result = IntelToWmi::ToIntelInstance(path, newInstance, pInst);
+		wbem::framework::InstanceFactory *pFactory =
+				wbem::framework::ProviderFactory::getInstanceFactoryStatic(path.getClass());
 
-		// convert WMI Instance to list of Attributes by iterating over pInst attributes
-		framework::attributes_t attributes;
-		pInst->BeginEnumeration(0);
-		std::string objectPathString; // used to get string object path (in __Path)
-		while (pInst->Next(0, &bName, &val, &type, NULL) != WBEM_S_NO_MORE_DATA)
+		wbem::framework::Instance *pCurrentInstance = pFactory->getInstance(path, attributenames);
+
+		modifiedAttributes = getModifiedAttributes(pCurrentInstance, &newInstance);
+		if (pFactory != NULL)
 		{
-			char *name = _com_util::ConvertBSTRToString(bName);
-			if (name != NULL)
+			try
 			{
-				framework::Attribute *pAttribute = IntelToWmi::ToIntelAttribute(val, type);
-
-				if (pAttribute != NULL)
-				{
-					if (std::string(name) == "__PATH")
-					{
-						objectPathString = pAttribute->stringValue();
-					}
-					attributes[name] = *pAttribute;
-					delete (pAttribute);
-				}
-				else
-				{
-					COMMON_LOG_ERROR_F("WMI Variant %s was not converted to an Attribute.",
-							name);
-					result = WBEM_E_FAILED;
-				}
+				pFactory->modifyInstance(path, modifiedAttributes);
 			}
-			else
+			catch (wbem::framework::ExceptionBadParameter &)
 			{
-				COMMON_LOG_ERROR("Could not get Attribute name from BSTR");
+				result = WBEM_E_INVALID_PARAMETER;
 			}
-		}
-
-		if (result == WBEM_NO_ERROR)
-		{
-			framework::ObjectPath path;
-			if (!objectPathString.empty())
+			catch (wbem::framework::ExceptionSystemError &e)
 			{
-				framework::ObjectPathBuilder builder(objectPathString);
-				builder.Build(&path);
-
-				wbem::framework::attributes_t keys = path.getKeys();
-				wbem::framework::attributes_itr_t iter = keys.begin();
-				for (;iter != keys.end(); iter++)
-				{
-					attributes[iter->first].setIsKey(true);
-				}
-
-				wbem::framework::InstanceFactory *pFactory =
-						wbem::framework::ProviderFactory::getInstanceFactoryStatic(path.getClass());
-				if (pFactory != NULL)
-				{
-					try
-					{
-						pFactory->modifyInstance(path, attributes);
-					}
-					catch (wbem::framework::ExceptionBadParameter &)
-					{
-						result = WBEM_E_INVALID_PARAMETER;
-					}
-					catch (wbem::framework::ExceptionSystemError &e)
-					{
-						result = WBEM_E_PROVIDER_FAILURE;
-					}
-					catch (wbem::framework::ExceptionNoMemory &)
-					{
-						result = WBEM_E_OUT_OF_MEMORY;
-					}
-					catch (wbem::framework::ExceptionNotSupported &)
-					{
-						result = WBEM_E_NOT_SUPPORTED;
-					}
-					catch (wbem::framework::Exception &)
-					{
-						result = WBEM_E_FAILED;
-					}
-				}
-				if (pFactory != NULL)
-				{
-					delete pFactory;
-				}
+				result = WBEM_E_PROVIDER_FAILURE;
 			}
-			else
+			catch (wbem::framework::ExceptionNoMemory &)
 			{
-				COMMON_LOG_ERROR("Did not find __Path attribute to build ObjectPath with");
+				result = WBEM_E_OUT_OF_MEMORY;
+			}
+			catch (wbem::framework::ExceptionNotSupported &)
+			{
+				result = WBEM_E_NOT_SUPPORTED;
+			}
+			catch (wbem::framework::Exception &)
+			{
 				result = WBEM_E_FAILED;
 			}
+		}
+		if (pFactory != NULL)
+		{
+			delete pFactory;
 		}
 		pResponseHandler->SetStatus(0, result, NULL, NULL);
 	}

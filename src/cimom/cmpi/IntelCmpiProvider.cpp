@@ -317,7 +317,7 @@ CMPIStatus Generic_CreateInstance
 }
 
 /*
- * Get Provider instance
+ * Get modified attributes
  */
 wbem::framework::attributes_t getModifiedAttributes(wbem::framework::Instance *pCurrentInstance, wbem::framework::Instance *pNewInstance)
 {
