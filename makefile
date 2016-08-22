@@ -215,7 +215,14 @@ uninstall :
 	$(RM) $(LIB_FILES)
 	$(RMDIR) $(FRAMEWORK_INCLUDE_DIR)
 
-rpm :
+gitcheck :
+ifeq ($(DIR_IS_NOT_GIT_REPO),"true")
+	git init
+	git add . 
+	git commit -a -m "Initial commit"
+endif
+
+rpm : gitcheck
 	#Make the Directories
 	$(MKDIR) $(RPMBUILD_DIR) $(RPMBUILD_DIR)/BUILD/$(LIB_BASENAME)-$(BUILDNUM) $(RPMBUILD_DIR)/SOURCES $(RPMBUILD_DIR)/RPMS \
 	$(RPMBUILD_DIR)/SRPMS $(RPMBUILD_DIR)/SPECS $(RPMBUILD_DIR)/BUILDROOT \
@@ -227,7 +234,7 @@ rpm :
 	$(SED) -i 's/^%define build_version .*/%define build_version $(BUILDNUM)/g' $(RPMBUILD_DIR)/SPECS/$(LIB_BASENAME).spec
 
 	#Archive the directory
-	git archive --format=tar --prefix="$(LIB_BASENAME)-$(BUILDNUM)/" HEAD | gzip -c > $(RPMBUILD_DIR)/SOURCES/$(LIB_BASENAME)-$(BUILDNUM).tar.gz
+	git archive --format=tar --prefix="$(LIB_BASENAME)-$(BUILDNUM)/" HEAD 2>/dev/null | gzip -c > $(RPMBUILD_DIR)/SOURCES/$(LIB_BASENAME)-$(BUILDNUM).tar.gz
 	#rpmbuild
 	$(RPMBUILD) -ba $(RPMBUILD_DIR)/SPECS/$(LIB_BASENAME).spec --define "_topdir $(RPMBUILD_DIR)" --define "cflag $(CFLAGS_EXTERNAL)"
 

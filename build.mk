@@ -59,9 +59,9 @@ BLDMK_SPACE = $(BLDMK_EMPTY) $(BLDMK_EMPTY)
 
 # version number passed in from the build server
 ifndef BUILDNUM
-	BUILDNUM= $(shell git describe --abbrev=0 | sed -e 's/\([a-zA-Z_-]*\)\(.*\)/\2/g')
+	BUILDNUM= $(shell git describe --abbrev=0 2>/dev/null | sed -e 's/\([a-zA-Z_-]*\)\(.*\)/\2/g')
 	ifeq ($(strip $(BUILDNUM)),)
-		BUILDNUM=99.99.99.9999
+		BUILDNUM= $(shell pwd | sed -nre 's/^[^0-9]*(([0-9]+\.)*[0-9]+).*/\1/p')
 	endif
 endif
 
@@ -150,6 +150,12 @@ ifeq ($(UNAME), Linux)
 			LINUX_DIST := sle
 		else
 			LINUX_DIST := $(warning Unrecognized Linux distribution)
+		endif
+
+		ifeq ("$(wildcard .git)","")
+			DIR_IS_NOT_GIT_REPO := "true"
+		else
+			DIR_IS_NOT_GIT_REPO := "false"
 		endif
 	endif		
 else
