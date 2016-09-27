@@ -477,7 +477,7 @@ wbem::framework::Attribute* cmpiToIntel(CMPIData *pCmpiAttribute, bool isKey, CM
 			break;
 		case CMPI_string       :
 		{
-			pResult =  new wbem::framework::Attribute(std::string(pCmpiAttribute->value.string->ft->getCharPtr(pCmpiAttribute->value.string, pStatus)), isKey);
+			pResult =  new wbem::framework::Attribute(std::string(CMGetCharPtr(pCmpiAttribute->value.string)), isKey);
 			break;
 		}
 		case CMPI_uint8A      :

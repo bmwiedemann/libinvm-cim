@@ -490,6 +490,8 @@ class Attribute
 
 	static bool typesMatch(enum DataType lhs, enum DataType rhs);
 
+	void normalize();
+
 private:
 		union attribute_t
 		{
@@ -523,8 +525,7 @@ private:
 		 */
 		template <typename TYPE>
 		bool listEqual(const TYPE list1, const TYPE list2) const;
-
-
+		void trimStr(STR &str);
 };
 
 /*!

@@ -323,13 +323,16 @@ wbem::framework::attributes_t getModifiedAttributes(wbem::framework::Instance *p
 {
 	LogEnterExit logging(__FILE__, __FUNCTION__, __LINE__);
 	wbem::framework::attributes_t attributes;
-	wbem::framework::attributes_t::const_iterator propIter = pNewInstance->attributesBegin();
-	for (; propIter != pNewInstance->attributesEnd(); propIter++)
+	wbem::framework::attributes_t::const_iterator propIter = pCurrentInstance->attributesBegin();
+	for (; propIter != pCurrentInstance->attributesEnd(); propIter++)
 	{
 		std::string key = (*propIter).first;
-		wbem::framework::Attribute modifiedInstProp = (*propIter).second;
-		wbem::framework::Attribute currInstProp;
-		pCurrentInstance->getAttribute(key, currInstProp);
+		wbem::framework::Attribute currInstProp = (*propIter).second;
+		wbem::framework::Attribute modifiedInstProp;
+		pNewInstance->getAttribute(key, modifiedInstProp);
+
+		currInstProp.normalize();
+		modifiedInstProp.normalize();
 
 		if (currInstProp != modifiedInstProp)
 		{

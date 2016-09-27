@@ -1141,6 +1141,49 @@ bool wbem::framework::Attribute::typesMatch(enum DataType lhs, enum DataType rhs
 	return match;
 }
 
+void wbem::framework::Attribute::trimStr(STR &str)
+{
+    std::string::iterator strStart = str.begin();
+    std::string::iterator strEnd = str.end();
+
+    while (std::isspace(*strStart))
+    {
+        ++strStart;
+    }
+
+    if (strStart != strEnd)
+    {
+        while (std::isspace(*(strEnd - 1)))
+        {
+            --strEnd;
+        }
+    }
+
+    str.assign(strStart, strEnd);
+}
+
+/*
+ * This is as a result of pegasus and sfcb CIMOM behavior where the normalization of the
+ * parsed XML string data (XML specification requirement) leads to a false mismatch between
+ * the Intel attribute and the modified cmpi attribute passed in the Generic_Modify
+ * function by the CIMOM
+ */
+void wbem::framework::Attribute::normalize()
+{
+	if (this->m_Type == STR_T)
+	{
+		trimStr(this->m_Str);
+	}
+	if (this->m_Type == STR_LIST_T)
+	{
+		for (STR_LIST::iterator i = this->m_StrList.begin();
+				i != this->m_StrList.end(); i++)
+		{
+			trimStr(*i);
+		}
+	}
+}
+
 
 bool wbem::framework::Attribute::isEmbedded()
 {
