@@ -528,70 +528,79 @@ HRESULT wbem::wmi::IntelWmiProvider::ExecMethodAsync(const BSTR strObjectPath,
 	else
 	{
 		COMMON_LOG_DEBUG_F("Method Name: %s", methodName);
-
-		wbem::framework::InstanceFactory *pFactory =
-				wbem::framework::ProviderFactory::getInstanceFactoryStatic(objectPath.getClass());
-		if (pFactory != NULL)
+		//Impersonate the client
+		rc = Impersonate();
+		if (FAILED (rc))
 		{
-			// convert pInParams to Attributes ...
-			BSTR bName;
-			VARIANT val;
-			CIMTYPE type;
-			framework::attributes_t inAttributes;
-			if (pInParams != NULL)
-			{
-				pInParams->BeginEnumeration(0);
-				while (pInParams->Next(0, &bName, &val, &type, NULL) != WBEM_S_NO_MORE_DATA)
-				{
-					char *name = _com_util::ConvertBSTRToString(bName);
-					if (NULL != name)
-					{
-						// ignore system attributes which start with __
-						if (!(name[0] == '_' && name[1] == '_'))
-						{
-							framework::Attribute attribute;
-							framework::Attribute *pAttribute = IntelToWmi::ToIntelAttribute(val, type);
-							if (pAttribute != NULL)
-							{
-								inAttributes[name] = *pAttribute;
-								delete pAttribute;
-							}
-							else
-							{
-								COMMON_LOG_ERROR("pAttribute wasn't created");
-								rc = WBEM_E_FAILED;
-							}
-						}
-						delete[] name;
-					}
-					else
-					{
-						COMMON_LOG_ERROR("Could not convert bName to name");
-						rc = WBEM_E_FAILED;
-					}
-				}
-			}
-
-			wbem::framework::attributes_t outAttributes;
-			wbem::framework::UINT32 wbemRc = 0;
-			wbem::framework::UINT32 httpRc =
-				pFactory->executeMethod(wbemRc, methodName, objectPath,
-						inAttributes, outAttributes);
-			delete[] methodName;
-
-			// Of course WMI is different than the CIM standard for error codes so do the mapping
-			rc = convertHttpRcToWmiRc(httpRc);
-
-			addMethodReturnCodeToReturnObject(className, strMethodName, pContext, pResponseHandler, wbemRc);
+			pResponseHandler->SetStatus(0, rc, NULL, NULL) ;
 		}
 		else
 		{
-			rc = WBEM_E_INVALID_CLASS;
-			COMMON_LOG_ERROR_F("Couldn't get factory for class %s",
-					objectPath.getClass().c_str());
+			wbem::framework::InstanceFactory *pFactory =
+					wbem::framework::ProviderFactory::getInstanceFactoryStatic(objectPath.getClass());
+			if (pFactory != NULL)
+			{
+				// convert pInParams to Attributes ...
+				BSTR bName;
+				VARIANT val;
+				CIMTYPE type;
+				framework::attributes_t inAttributes;
+				if (pInParams != NULL)
+				{
+					pInParams->BeginEnumeration(0);
+					while (pInParams->Next(0, &bName, &val, &type, NULL) != WBEM_S_NO_MORE_DATA)
+					{
+						char *name = _com_util::ConvertBSTRToString(bName);
+						if (NULL != name)
+						{
+							// ignore system attributes which start with __
+							if (!(name[0] == '_' && name[1] == '_'))
+							{
+								framework::Attribute attribute;
+								framework::Attribute *pAttribute = IntelToWmi::ToIntelAttribute(val, type);
+								if (pAttribute != NULL)
+								{
+									inAttributes[name] = *pAttribute;
+									delete pAttribute;
+								}
+								else
+								{
+									COMMON_LOG_ERROR("pAttribute wasn't created");
+									rc = WBEM_E_FAILED;
+								}
+							}
+							delete[] name;
+						}
+						else
+						{
+							COMMON_LOG_ERROR("Could not convert bName to name");
+							rc = WBEM_E_FAILED;
+						}
+					}
+				}
+
+				wbem::framework::attributes_t outAttributes;
+				wbem::framework::UINT32 wbemRc = 0;
+				wbem::framework::UINT32 httpRc =
+					pFactory->executeMethod(wbemRc, methodName, objectPath,
+							inAttributes, outAttributes);
+				delete[] methodName;
+
+				// Of course WMI is different than the CIM standard for error codes so do the mapping
+				rc = convertHttpRcToWmiRc(httpRc);
+
+				addMethodReturnCodeToReturnObject(className, strMethodName, pContext, pResponseHandler, wbemRc);
+			}
+			else
+			{
+				rc = WBEM_E_INVALID_CLASS;
+				COMMON_LOG_ERROR_F("Couldn't get factory for class %s",
+						objectPath.getClass().c_str());
+			}
+			pResponseHandler->SetStatus(0,rc, NULL, NULL);
+			delete pFactory;
+			CoRevertToSelf();
 		}
-		pResponseHandler->SetStatus(0,rc, NULL, NULL);
-		delete pFactory;
 	}
 	return rc;
 }
@@ -648,45 +657,54 @@ HRESULT STDMETHODCALLTYPE wbem::wmi::IntelWmiProvider::PutInstanceAsync(
 		wbem::framework::ObjectPath path;
 		wbem::framework::attributes_t modifiedAttributes;
 
-		result = IntelToWmi::ToIntelInstance(path, newInstance, pInst);
-		wbem::framework::InstanceFactory *pFactory =
-				wbem::framework::ProviderFactory::getInstanceFactoryStatic(path.getClass());
-
-		wbem::framework::Instance *pCurrentInstance = pFactory->getInstance(path, attributenames);
-
-		modifiedAttributes = getModifiedAttributes(pCurrentInstance, &newInstance);
-		if (pFactory != NULL)
+		result = Impersonate();
+		if (FAILED(result))
 		{
-			try
-			{
-				pFactory->modifyInstance(path, modifiedAttributes);
-			}
-			catch (wbem::framework::ExceptionBadParameter &)
-			{
-				result = WBEM_E_INVALID_PARAMETER;
-			}
-			catch (wbem::framework::ExceptionSystemError &e)
-			{
-				result = WBEM_E_PROVIDER_FAILURE;
-			}
-			catch (wbem::framework::ExceptionNoMemory &)
-			{
-				result = WBEM_E_OUT_OF_MEMORY;
-			}
-			catch (wbem::framework::ExceptionNotSupported &)
-			{
-				result = WBEM_E_NOT_SUPPORTED;
-			}
-			catch (wbem::framework::Exception &)
-			{
-				result = WBEM_E_FAILED;
-			}
+			pResponseHandler->SetStatus(0, result, NULL, NULL);
 		}
-		if (pFactory != NULL)
+		else
 		{
-			delete pFactory;
+			result = IntelToWmi::ToIntelInstance(path, newInstance, pInst);
+			wbem::framework::InstanceFactory *pFactory =
+					wbem::framework::ProviderFactory::getInstanceFactoryStatic(path.getClass());
+
+			wbem::framework::Instance *pCurrentInstance = pFactory->getInstance(path, attributenames);
+
+			modifiedAttributes = getModifiedAttributes(pCurrentInstance, &newInstance);
+			if (pFactory != NULL)
+			{
+				try
+				{
+					pFactory->modifyInstance(path, modifiedAttributes);
+				}
+				catch (wbem::framework::ExceptionBadParameter &)
+				{
+					result = WBEM_E_INVALID_PARAMETER;
+				}
+				catch (wbem::framework::ExceptionSystemError &e)
+				{
+					result = WBEM_E_PROVIDER_FAILURE;
+				}
+				catch (wbem::framework::ExceptionNoMemory &)
+				{
+					result = WBEM_E_OUT_OF_MEMORY;
+				}
+				catch (wbem::framework::ExceptionNotSupported &)
+				{
+					result = WBEM_E_NOT_SUPPORTED;
+				}
+				catch (wbem::framework::Exception &)
+				{
+					result = WBEM_E_FAILED;
+				}
+			}
+			if (pFactory != NULL)
+			{
+				delete pFactory;
+			}
+			pResponseHandler->SetStatus(0, result, NULL, NULL);
+			CoRevertToSelf();
 		}
-		pResponseHandler->SetStatus(0, result, NULL, NULL);
 	}
 	return result;
 };
