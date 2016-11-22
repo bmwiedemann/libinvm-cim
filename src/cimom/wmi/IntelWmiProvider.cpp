@@ -211,48 +211,51 @@ SCODE wbem::wmi::IntelWmiProvider::CreateInstanceEnumAsync(
 {
 	LogEnterExit logging(__FILE__, __FUNCTION__, __LINE__);
 	SCODE sc = S_OK;
-	char *mofClass;
 
-	mofClass = _com_util::ConvertBSTRToString(RefStr);
-	if (NULL == mofClass)
+	if (pHandler == NULL)
 	{
-		// mofClass will be NULL if RefStr is not a valid BSTR
 		sc = WBEM_E_INVALID_PARAMETER;
 	}
 	else
 	{
-		COMMON_LOG_DEBUG_F("CreateInstanceEnum for %s class\n", mofClass);
-
-		sc = Impersonate();
-		if (FAILED(sc))
+		char *mofClass;
+		mofClass = _com_util::ConvertBSTRToString(RefStr);
+		if (NULL == mofClass || m_pNamespace == NULL)
 		{
-			pHandler->SetStatus(0, sc, NULL, NULL);
+			// mofClass will be NULL if RefStr is not a valid BSTR
+			sc = WBEM_E_INVALID_PARAMETER;
 		}
 		else
 		{
-			// Do a check of arguments and ensure you have a pointer to Namespace
-			if (pHandler == NULL || m_pNamespace == NULL)
+			COMMON_LOG_DEBUG_F("CreateInstanceEnum for %s class\n", mofClass);
+
+			HRESULT hr = Impersonate();
+			if (FAILED(hr))
 			{
-				sc = WBEM_E_INVALID_PARAMETER;
+				sc = hr;
 			}
 			else
 			{
-				// get the instance factory ...
-				wbem::framework::InstanceFactory *pFactory =
-						wbem::framework::ProviderFactory::getInstanceFactoryStatic(mofClass);
-				if (pFactory == NULL)
+				wbem::framework::ProviderFactory *pProviderFactory =
+						wbem::framework::ProviderFactory::getSingleton();
+				if (pProviderFactory == NULL)
 				{
-					pHandler->SetStatus( 0 , WBEM_E_INVALID_CLASS , NULL , NULL );
-					sc = WBEM_E_INVALID_CLASS;
+					sc = WBEM_E_FAILED;
 				}
 				else
 				{
-					if (sc != S_OK)
+					pProviderFactory->InitializeProvider();
+
+					// get the instance factory ...
+					wbem::framework::InstanceFactory *pFactory =
+							pProviderFactory->getInstanceFactory(mofClass);
+					if (pFactory == NULL)
 					{
-						pHandler->SetStatus( 0 , WBEM_E_FAILED , NULL , NULL );
+						sc = WBEM_E_INVALID_CLASS;
 					}
 					else
 					{
+
 						wbem::framework::instances_t *pInstances = NULL;
 						try
 						{
@@ -297,16 +300,14 @@ SCODE wbem::wmi::IntelWmiProvider::CreateInstanceEnumAsync(
 							delete pInstances;
 							pInstances = NULL;
 						}
-						pHandler->SetStatus(0, sc, NULL, NULL);
+						delete pFactory;
 					}
+					pProviderFactory->CleanUpProvider();
 				}
-				if (pFactory)
-				{
-					delete pFactory;
-				}
+				CoRevertToSelf();
 			}
-			CoRevertToSelf();
 		}
+		pHandler->SetStatus(0, sc, NULL, NULL);
 	}
 	return sc;
 }
@@ -320,41 +321,56 @@ SCODE wbem::wmi::IntelWmiProvider::GetObjectAsync(const BSTR ObjectPath, long lF
 	LogEnterExit logging(__FILE__, __FUNCTION__, __LINE__);
 	SCODE rc = S_OK;
 
-	//Impersonate the client
-	HRESULT hr = Impersonate();
-	if (FAILED (hr))
+	if (pHandler == NULL)
 	{
-		pHandler->SetStatus(0, hr, NULL, NULL) ;
-		rc = hr;
+		rc = WBEM_E_INVALID_PARAMETER;
 	}
+	// Do a check of arguments and ensure you have a pointer to Namespace
 	else
 	{
-		IWbemClassObject FAR* pObj;
-		BOOL bOK = FALSE;
-
-		// Do a check of arguments and ensure
-		// you have a pointer to Namespace
-		if (ObjectPath == NULL || pHandler == NULL || m_pNamespace == NULL)
+		if (ObjectPath == NULL || m_pNamespace == NULL)
 		{
 			rc = WBEM_E_INVALID_PARAMETER;
 		}
 		else
 		{
-			// do the get, pass the object on to the notify
-			rc = GetByPath(ObjectPath, &pObj, pCtx);
-			if (rc == S_OK)
+			//Impersonate the client
+			HRESULT hr = Impersonate();
+			if (FAILED(hr))
 			{
-				pHandler->Indicate(1, &pObj);
-				pObj->Release();
-				bOK = TRUE;
+				rc = hr;
 			}
+			else
+			{
+				IWbemClassObject FAR* pObj;
+				BOOL bOK = FALSE;
 
-			rc = (bOK) ? S_OK : WBEM_E_NOT_FOUND;
+				wbem::framework::ProviderFactory *pProviderFactory =
+						wbem::framework::ProviderFactory::getSingleton();
+				if (pProviderFactory == NULL)
+				{
+					rc = WBEM_E_FAILED;
+				}
+				else
+				{
+					pProviderFactory->InitializeProvider();
+					// do the get, pass the object on to the notify
+					rc = GetByPath(ObjectPath, &pObj, pCtx);
+					if (rc == S_OK)
+					{
+						pHandler->Indicate(1, &pObj);
+						pObj->Release();
+						bOK = TRUE;
+					}
 
-			// Set Status
-			pHandler->SetStatus(0,rc, NULL, NULL);
+					rc = (bOK) ? S_OK : WBEM_E_NOT_FOUND;
+					pProviderFactory->CleanUpProvider();
+				}
+				CoRevertToSelf();
+			}
 		}
-		CoRevertToSelf();
+		// Set Status
+		pHandler->SetStatus(0,rc, NULL, NULL);
 	}
 	return rc;
 }
@@ -515,92 +531,109 @@ HRESULT wbem::wmi::IntelWmiProvider::ExecMethodAsync(const BSTR strObjectPath,
 	LogEnterExit logging(__FILE__, __FUNCTION__, __LINE__);
 	HRESULT rc = WBEM_NO_ERROR;
 
-	framework::ObjectPath objectPath; // use the object path to get the class name
-	IntelToWmi::BstrToObjectPath(strObjectPath, &objectPath);
-	const char *className = objectPath.getClass().c_str();
-	COMMON_LOG_DEBUG_F("ObjectPath Class: %s", objectPath.getClass().c_str());
-
-	char *methodName = _com_util::ConvertBSTRToString(strMethodName);
-	if (NULL == methodName)
+	if (pResponseHandler == NULL)
 	{
-		rc = WBEM_E_FAILED;
+		rc = WBEM_E_INVALID_PARAMETER;
 	}
 	else
 	{
-		COMMON_LOG_DEBUG_F("Method Name: %s", methodName);
-		//Impersonate the client
-		rc = Impersonate();
-		if (FAILED (rc))
+		framework::ObjectPath objectPath; // use the object path to get the class name
+		IntelToWmi::BstrToObjectPath(strObjectPath, &objectPath);
+		const char *className = objectPath.getClass().c_str();
+		COMMON_LOG_DEBUG_F("ObjectPath Class: %s", objectPath.getClass().c_str());
+		char *methodName = _com_util::ConvertBSTRToString(strMethodName);
+		if (methodName == NULL || m_pNamespace == NULL)
 		{
-			pResponseHandler->SetStatus(0, rc, NULL, NULL) ;
+			rc = WBEM_E_INVALID_PARAMETER;
 		}
 		else
 		{
-			wbem::framework::InstanceFactory *pFactory =
-					wbem::framework::ProviderFactory::getInstanceFactoryStatic(objectPath.getClass());
-			if (pFactory != NULL)
+			COMMON_LOG_DEBUG_F("Method Name: %s", methodName);
+			//Impersonate the client
+			HRESULT hr = Impersonate();
+			if (FAILED (hr))
 			{
-				// convert pInParams to Attributes ...
-				BSTR bName;
-				VARIANT val;
-				CIMTYPE type;
-				framework::attributes_t inAttributes;
-				if (pInParams != NULL)
-				{
-					pInParams->BeginEnumeration(0);
-					while (pInParams->Next(0, &bName, &val, &type, NULL) != WBEM_S_NO_MORE_DATA)
-					{
-						char *name = _com_util::ConvertBSTRToString(bName);
-						if (NULL != name)
-						{
-							// ignore system attributes which start with __
-							if (!(name[0] == '_' && name[1] == '_'))
-							{
-								framework::Attribute attribute;
-								framework::Attribute *pAttribute = IntelToWmi::ToIntelAttribute(val, type);
-								if (pAttribute != NULL)
-								{
-									inAttributes[name] = *pAttribute;
-									delete pAttribute;
-								}
-								else
-								{
-									COMMON_LOG_ERROR("pAttribute wasn't created");
-									rc = WBEM_E_FAILED;
-								}
-							}
-							delete[] name;
-						}
-						else
-						{
-							COMMON_LOG_ERROR("Could not convert bName to name");
-							rc = WBEM_E_FAILED;
-						}
-					}
-				}
-
-				wbem::framework::attributes_t outAttributes;
-				wbem::framework::UINT32 wbemRc = 0;
-				wbem::framework::UINT32 httpRc =
-					pFactory->executeMethod(wbemRc, methodName, objectPath,
-							inAttributes, outAttributes);
-				delete[] methodName;
-
-				// Of course WMI is different than the CIM standard for error codes so do the mapping
-				rc = convertHttpRcToWmiRc(httpRc);
-
-				addMethodReturnCodeToReturnObject(className, strMethodName, pContext, pResponseHandler, wbemRc);
+				rc = hr;
 			}
 			else
 			{
-				rc = WBEM_E_INVALID_CLASS;
-				COMMON_LOG_ERROR_F("Couldn't get factory for class %s",
-						objectPath.getClass().c_str());
+				wbem::framework::ProviderFactory *pProviderFactory =
+						wbem::framework::ProviderFactory::getSingleton();
+				if (pProviderFactory == NULL)
+				{
+					rc = WBEM_E_FAILED;
+				}
+				else
+				{
+					pProviderFactory->InitializeProvider();
+					wbem::framework::InstanceFactory *pFactory =
+							pProviderFactory->getInstanceFactory(objectPath.getClass());
+					if (pFactory == NULL)
+					{
+							rc = WBEM_E_INVALID_CLASS;
+							COMMON_LOG_ERROR_F("Couldn't get factory for class %s",
+									objectPath.getClass().c_str());
+					}
+					else
+					{
+						// convert pInParams to Attributes ...
+						BSTR bName;
+						VARIANT val;
+						CIMTYPE type;
+						framework::attributes_t inAttributes;
+						if (pInParams != NULL)
+						{
+							pInParams->BeginEnumeration(0);
+							while (pInParams->Next(0, &bName, &val, &type, NULL) != WBEM_S_NO_MORE_DATA)
+							{
+								char *name = _com_util::ConvertBSTRToString(bName);
+								if (NULL != name)
+								{
+									// ignore system attributes which start with __
+									if (!(name[0] == '_' && name[1] == '_'))
+									{
+										framework::Attribute attribute;
+										framework::Attribute *pAttribute = IntelToWmi::ToIntelAttribute(val, type);
+										if (pAttribute != NULL)
+										{
+											inAttributes[name] = *pAttribute;
+											delete pAttribute;
+										}
+										else
+										{
+											COMMON_LOG_ERROR("pAttribute wasn't created");
+											rc = WBEM_E_FAILED;
+										}
+									}
+									delete[] name;
+								}
+								else
+								{
+									COMMON_LOG_ERROR("Could not convert bName to name");
+									rc = WBEM_E_FAILED;
+								}
+							}
+						}
+
+						wbem::framework::attributes_t outAttributes;
+						wbem::framework::UINT32 wbemRc = 0;
+						wbem::framework::UINT32 httpRc =
+							pFactory->executeMethod(wbemRc, methodName, objectPath,
+									inAttributes, outAttributes);
+
+						// Of course WMI is different than the CIM standard for error codes so do the mapping
+						rc = convertHttpRcToWmiRc(httpRc);
+
+						addMethodReturnCodeToReturnObject(className, strMethodName, pContext, pResponseHandler, wbemRc);
+						delete pFactory;
+					}
+					pProviderFactory->CleanUpProvider();
+				}
+				CoRevertToSelf();
 			}
-			pResponseHandler->SetStatus(0,rc, NULL, NULL);
-			delete pFactory;
-			CoRevertToSelf();
+			delete[] methodName;
 		}
+		pResponseHandler->SetStatus(0, rc, NULL, NULL);
 	}
 	return rc;
 }
@@ -641,70 +674,82 @@ HRESULT STDMETHODCALLTYPE wbem::wmi::IntelWmiProvider::PutInstanceAsync(
 	LogEnterExit logging(__FILE__, __FUNCTION__, __LINE__);
 	HRESULT result = WBEM_NO_ERROR;
 
-	// check used parameters
-	if (pInst == NULL)
-	{
-		result = WBEM_E_INVALID_PARAMETER;
-	}
-	else if (pResponseHandler == NULL)
+	if (pResponseHandler == NULL)
 	{
 		result = WBEM_E_INVALID_PARAMETER;
 	}
 	else
 	{
-		wbem::framework::Instance newInstance;
-		wbem::framework::attribute_names_t attributenames;
-		wbem::framework::ObjectPath path;
-		wbem::framework::attributes_t modifiedAttributes;
-
-		result = Impersonate();
-		if (FAILED(result))
+		// check used parameters
+		if (pInst == NULL)
 		{
-			pResponseHandler->SetStatus(0, result, NULL, NULL);
+			result = WBEM_E_INVALID_PARAMETER;
 		}
 		else
 		{
-			result = IntelToWmi::ToIntelInstance(path, newInstance, pInst);
-			wbem::framework::InstanceFactory *pFactory =
-					wbem::framework::ProviderFactory::getInstanceFactoryStatic(path.getClass());
+			wbem::framework::Instance newInstance;
+			wbem::framework::attribute_names_t attributenames;
+			wbem::framework::ObjectPath path;
+			wbem::framework::attributes_t modifiedAttributes;
 
-			wbem::framework::Instance *pCurrentInstance = pFactory->getInstance(path, attributenames);
-
-			modifiedAttributes = getModifiedAttributes(pCurrentInstance, &newInstance);
-			if (pFactory != NULL)
+			HRESULT hr = Impersonate();
+			if (FAILED(hr))
 			{
-				try
-				{
-					pFactory->modifyInstance(path, modifiedAttributes);
-				}
-				catch (wbem::framework::ExceptionBadParameter &)
-				{
-					result = WBEM_E_INVALID_PARAMETER;
-				}
-				catch (wbem::framework::ExceptionSystemError &e)
-				{
-					result = WBEM_E_PROVIDER_FAILURE;
-				}
-				catch (wbem::framework::ExceptionNoMemory &)
-				{
-					result = WBEM_E_OUT_OF_MEMORY;
-				}
-				catch (wbem::framework::ExceptionNotSupported &)
-				{
-					result = WBEM_E_NOT_SUPPORTED;
-				}
-				catch (wbem::framework::Exception &)
+				result = hr;
+			}
+			else
+			{
+				wbem::framework::ProviderFactory *pProviderFactory =
+						wbem::framework::ProviderFactory::getSingleton();
+				if (pProviderFactory == NULL)
 				{
 					result = WBEM_E_FAILED;
 				}
+				else
+				{
+					pProviderFactory->InitializeProvider();
+
+					result = IntelToWmi::ToIntelInstance(path, newInstance, pInst);
+					wbem::framework::InstanceFactory *pFactory =
+							pProviderFactory->getInstanceFactory(path.getClass());
+
+					wbem::framework::Instance *pCurrentInstance = pFactory->getInstance(path, attributenames);
+
+					modifiedAttributes = getModifiedAttributes(pCurrentInstance, &newInstance);
+					if (pFactory != NULL)
+					{
+						try
+						{
+							pFactory->modifyInstance(path, modifiedAttributes);
+						}
+						catch (wbem::framework::ExceptionBadParameter &)
+						{
+							result = WBEM_E_INVALID_PARAMETER;
+						}
+						catch (wbem::framework::ExceptionSystemError &e)
+						{
+							result = WBEM_E_PROVIDER_FAILURE;
+						}
+						catch (wbem::framework::ExceptionNoMemory &)
+						{
+							result = WBEM_E_OUT_OF_MEMORY;
+						}
+						catch (wbem::framework::ExceptionNotSupported &)
+						{
+							result = WBEM_E_NOT_SUPPORTED;
+						}
+						catch (wbem::framework::Exception &)
+						{
+							result = WBEM_E_FAILED;
+						}
+						delete pFactory;
+					}
+					pProviderFactory->CleanUpProvider();
+				}
+				CoRevertToSelf();
 			}
-			if (pFactory != NULL)
-			{
-				delete pFactory;
-			}
-			pResponseHandler->SetStatus(0, result, NULL, NULL);
-			CoRevertToSelf();
 		}
+		pResponseHandler->SetStatus(0, result, NULL, NULL);
 	}
 	return result;
 };
