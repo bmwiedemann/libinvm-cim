@@ -72,7 +72,7 @@ wbem::framework::CimXml::CimXml(std::string cimXml)
 		generateAttributes(pInstance, CX_PROPERTY, CX_VALUE); // generate non-array attributes
 		generateAttributes(pInstance, CX_PROPERTYARRAY, CX_VALUEARRAY); // generate array attributes
 	}
-	catch (const std::exception &)
+	catch (const std::exception &e)
 	{
 		throw ExceptionBadParameter("cimXml");
 	}
@@ -99,7 +99,6 @@ void wbem::framework::CimXml::generateAttributes(const rapidxml::xml_node<> *pIn
 		type = node->first_attribute(CX_TYPE.c_str());
 		notNull(name, __FUNCTION__, CX_NAME);
 		notNull(type, __FUNCTION__, CX_TYPE);
-
 		pValue = node->first_node(valueTag.c_str());
 
 		m_attributes[name->value()] = createAttribute(type->value(), pValue, true, isArray);
@@ -389,6 +388,10 @@ bool wbem::framework::CimXml::toBoolean(std::string value)
 		result = true;
 	}
 	else if (StringUtil::stringCompareIgnoreCase(value, CX_FALSE))
+	{
+		result = false;
+	}
+	else if (value.empty())
 	{
 		result = false;
 	}
