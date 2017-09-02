@@ -70,7 +70,7 @@ HEADER_DIRS = $(MODULES) $(COMMON_DIR) $(CIMOM_ROOT) $(CIMOM_ROOT)/wmi $(CIMOM_R
 
 CPP_OBJS = $(patsubst $(SRC_DIR)/%.cpp,%.o,$(CPP_SRC))
 C_OBJS = $(patsubst $(SRC_DIR)/%.c,%.o,$(C_SRC))
-OBJS = $(C_OBJS) $(CPP_OBJS)
+OBJS = $(sort $(C_OBJS) $(CPP_OBJS))
 # add the resource file on windows
 ifdef BUILD_WINDOWS
 	OBJS += framework_resources.o
